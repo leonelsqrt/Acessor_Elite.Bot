@@ -125,6 +125,9 @@ export async function handleCallback(
         case 'finances':
             await showPlaceholder(chatId, messageId, '💰 Finanças', 'Em breve você poderá gerenciar suas finanças aqui!');
             break;
+        case 'reminders':
+            await showPlaceholder(chatId, messageId, '⏰ Lembretes', 'Em breve você poderá criar lembretes personalizados!');
+            break;
 
         // No-op button (separator)
         case 'noop':

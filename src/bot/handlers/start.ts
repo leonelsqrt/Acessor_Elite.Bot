@@ -9,7 +9,7 @@ function getProgressBar(percent: number): string {
     const cappedPercent = Math.min(percent, 100);
     const filled = Math.round((cappedPercent / 100) * length);
     const empty = length - filled;
-    return '🟦'.repeat(Math.min(filled, length)) + '⬜'.repeat(Math.max(empty, 0));
+    return '🟦'.repeat(Math.min(filled, length)) + '▪️'.repeat(Math.max(empty, 0));
 }
 
 // Emoji de status
@@ -59,7 +59,7 @@ export async function handleStart(chatId: number, userId: number): Promise<void>
 
     const keyboard = buildKeyboard([
         [
-            { text: '☀️ Acordar', callback_data: 'good_morning' },
+            { text: '⏰ Lembretes', callback_data: 'reminders' },
             { text: '🌙 Dormir', callback_data: 'good_night' },
         ],
         [
@@ -141,7 +141,7 @@ export async function showHub(chatId: number, messageId: number, userId: number)
 
     const keyboard = buildKeyboard([
         [
-            { text: '☀️ Acordar', callback_data: 'good_morning' },
+            { text: '⏰ Lembretes', callback_data: 'reminders' },
             { text: '🌙 Dormir', callback_data: 'good_night' },
         ],
         [

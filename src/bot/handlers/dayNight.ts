@@ -1,7 +1,14 @@
 import { editMessage, buildKeyboard } from '../../utils/telegram.js';
 import { logSleep, getSleepStats } from '../../db/health.js';
-import { formatDuration, formatTimeOnly } from '../../utils/format.js';
+import { formatTimeOnly } from '../../utils/format.js';
 import { showHub } from './start.js';
+
+// Formatar duração no padrão XhYmin
+function formatDurationCompact(minutes: number): string {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}h${mins}min`;
+}
 
 // Handle "Acordei" / "Bom Dia" button
 export async function handleGoodMorning(
@@ -20,25 +27,22 @@ export async function handleGoodMorning(
     // Show quick confirmation then return to Hub
     let text = `
 <b>☀️ BOM DIA, LEONEL!</b>
-═══════════════════════════
+─────────────────────
 
 ⏰ Acordou às <b>${formatTimeOnly(now)}</b>
 
 `;
 
     // Show sleep duration if available
-    if (stats?.lastSleep) {
-        const sleepTime = new Date(stats.lastSleep);
-        const durationMs = now.getTime() - sleepTime.getTime();
-        const durationMinutes = Math.round(durationMs / (1000 * 60));
+    if (stats?.todaySleepHours && stats.todaySleepHours > 0) {
+        const totalMinutes = Math.round(stats.todaySleepHours * 60);
+        text += `😴 Dormiu por <b>${formatDurationCompact(totalMinutes)}</b>\n\n`;
 
-        text += `😴 Dormiu <b>${formatDuration(durationMinutes)}</b>\n\n`;
-
-        if (durationMinutes < 360) {
+        if (totalMinutes < 360) {
             text += `<i>⚠️ Poucas horas de sono. Cuide-se hoje!</i>`;
-        } else if (durationMinutes >= 420 && durationMinutes <= 540) {
+        } else if (totalMinutes >= 420 && totalMinutes <= 540) {
             text += `<i>✅ Noite ideal! Você está no caminho certo.</i>`;
-        } else if (durationMinutes > 540) {
+        } else if (totalMinutes > 540) {
             text += `<i>💤 Bastante descanso! Energia renovada!</i>`;
         } else {
             text += `<i>😊 Bom descanso! Vamos ter um dia produtivo!</i>`;
@@ -49,8 +53,8 @@ export async function handleGoodMorning(
 
     text += `
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
-<i>Retornando ao Hub em 2 segundos...</i>
+─────────────────────
+<i>Retornando ao Hub...</i>
 `;
 
     await editMessage(chatId, messageId, text);
@@ -73,46 +77,53 @@ export async function handleGoodNight(
     const now = new Date();
     const stats = await getSleepStats(userId);
 
-    // Calculate time awake if we have wake time
+    // Calculate time awake and get message
+    let awakeMinutes = 0;
     let awakeInfo = '';
+
     if (stats?.lastWake) {
         const wakeTime = new Date(stats.lastWake);
-        // Only calculate if wake was today
-        if (wakeTime.toDateString() === now.toDateString()) {
-            const durationMs = now.getTime() - wakeTime.getTime();
-            const durationMinutes = Math.round(durationMs / (1000 * 60));
-            awakeInfo = `☀️ Dia ativo: <b>${formatDuration(durationMinutes)}</b>\n`;
+        const durationMs = now.getTime() - wakeTime.getTime();
+        awakeMinutes = Math.round(durationMs / (1000 * 60));
+
+        // Só mostra se faz sentido (menos de 24h)
+        if (awakeMinutes > 0 && awakeMinutes < 1440) {
+            awakeInfo = `☀️ Dia ativo: <b>${formatDurationCompact(awakeMinutes)}</b>\n`;
         }
+    }
+
+    // Lógica de mensagem baseada no tempo acordado
+    // Se acordar às 06:30 e precisa de 8h de sono, ideal é dormir às 22:30 = 16h acordado
+    // <= 16h (960min) = excelente | 16-17h (960-1020min) = ok | >17h (>1020min) = alerta
+    let sleepMessage = '';
+    if (awakeMinutes > 0 && awakeMinutes < 1440) {
+        if (awakeMinutes <= 960) {
+            sleepMessage = `👏 Excelente! Sono ideal garantido.`;
+        } else if (awakeMinutes <= 1020) {
+            sleepMessage = `😐 Ok, mas tente dormir mais cedo amanhã.`;
+        } else {
+            sleepMessage = `⚠️ Atenção! Sono pode ser prejudicado.`;
+        }
+    } else {
+        sleepMessage = `💤 Bons sonhos!`;
     }
 
     let text = `
 <b>🌙 BOA NOITE, LEONEL!</b>
-═══════════════════════════
+─────────────────────
 
 ⏰ Dormindo às <b>${formatTimeOnly(now)}</b>
 ${awakeInfo}
-`;
-
-    // Check time and give feedback
-    const hour = now.getHours();
-    if (hour < 22) {
-        text += `<i>👏 Excelente! Dormir cedo é um ótimo hábito!</i>`;
-    } else if (hour >= 22 && hour < 24) {
-        text += `<i>😊 Hora boa para descansar. Bons sonhos!</i>`;
-    } else {
-        text += `<i>😴 Já é tarde! Descanse bem e recupere!</i>`;
-    }
-
-    text += `
+<i>${sleepMessage}</i>
 
 💤 <b>Registrado com sucesso!</b>
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+─────────────────────
 <i>Até amanhã! 🌟</i>
 `;
 
     const keyboard = buildKeyboard([
-        [{ text: '↩️ Voltar ao Hub', callback_data: 'hub' }],
+        [{ text: '☀️ Acordar', callback_data: 'good_morning' }],
     ]);
 
     await editMessage(chatId, messageId, text, { replyMarkup: keyboard });
