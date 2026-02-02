@@ -1,7 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env.js';
-
-const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
 const SYSTEM_PROMPT = `
 Você é o "Assessor Elite", um assistente pessoal inteligente integrado a um bot do Telegram.
@@ -25,7 +22,8 @@ Sua função é interpretar a linguagem natural do usuário e converter em AÇÕ
 
 **FORMATO DE RESPOSTA OBRIGATÓRIO (JSON):**
 
-Você DEVE retornar APENAS um JSON válido, sem markdown, sem explicações extras.
+Você DEVE retornar APENAS um JSON válido, sem markdown, sem trechos de código (\`\`\`). 
+NÃO ADICIONE \`\`\`json no inicio.
 
 Estruturas possíveis:
 
@@ -83,49 +81,49 @@ export type AIAction =
   | { type: 'health_water'; data: { amountMl: number }; response: string }
   | { type: 'chat'; response: string };
 
-const MODELS_TO_TRY = ['gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
-
 export async function processTextWithAI(text: string): Promise<AIAction> {
-  let lastError: any;
+  try {
+    console.log('🤖 Consultando Perplexity AI...');
 
-  for (const modelName of MODELS_TO_TRY) {
-    try {
-      console.log(`🤖 Tentando modelo IA: ${modelName}...`);
-      const model = genAI.getGenerativeModel({ model: modelName });
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${config.perplexityApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: config.perplexityModel,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: text }
+        ],
+        temperature: 0.2 // Baixa temperatura para ser mais determinístico no JSON
+      })
+    });
 
-      const result = await model.generateContent({
-        contents: [{ role: 'user', parts: [{ text: SYSTEM_PROMPT + `\n\nUSUÁRIO DIZ: "${text}"` }] }],
-      });
-
-      const responseText = result.response.text();
-      console.log(`🤖 Sucesso com ${modelName}! Response Raw:`, responseText);
-
-      // Limpar markdown se houver (gemini-pro gosta de ```json)
-      const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-      try {
-        return JSON.parse(jsonStr);
-      } catch (e) {
-        console.error(`❌ Erro ao parsear JSON do modelo ${modelName}:`, e);
-        // Se falhar o JSON, mas a API funcionou, talvez não devamos tentar outro modelo de imediato, 
-        // mas para garantir, vamos assumir que o modelo foi burro e tentar o próximo se houver.
-        // Mas geralmente é melhor retornar erro de entendimento.
-        return { type: 'chat', response: 'Desculpe, não consegui entender exatamente. Pode repetir?' };
-      }
-
-    } catch (error: any) {
-      console.error(`❌ Falha com modelo ${modelName}:`, error.message);
-      lastError = error;
-      // Continua para o próximo modelo
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`Perplexity API Error: ${response.statusText} (${errorBody})`);
     }
-  }
 
-  // Se chegou aqui, todos falharam
-  console.error('❌ Todos os modelos de IA falharam.');
-  if (lastError?.status === 403 || lastError?.message?.includes('API key')) {
-    return { type: 'chat', response: '⚠️ Erro de permissão na API Key. Verifique se a chave é válida.' };
-  }
+    const data = await response.json();
+    const responseText = data.choices[0].message.content;
 
-  return { type: 'chat', response: 'Estou sem conexão com minha inteligência no momento. Tente novamente mais tarde.' };
+    console.log('🤖 Perplexity Response Raw:', responseText);
+
+    // Limpeza de sanitização garantida
+    const jsonStr = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.error('❌ Erro ao parsear JSON da IA:', e);
+      // Fallback tentativo se o JSON falhou mas veio texto
+      return { type: 'chat', response: responseText };
+    }
+
+  } catch (error: any) {
+    console.error('❌ Erro na API Perplexity:', error.message);
+    return { type: 'chat', response: 'Estou com dificuldades de conexão com minha inteligência (Perplexity) agora.' };
+  }
 }
-

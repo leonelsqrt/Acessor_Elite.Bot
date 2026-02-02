@@ -41,9 +41,9 @@ export const config = {
     idealSleepStart: optionalEnv('IDEAL_SLEEP_START', '23:00'),
     idealSleepEnd: optionalEnv('IDEAL_SLEEP_END', '07:00'),
 
-    // Gemini AI
-    geminiApiKey: requireEnv('GEMINI_API_KEY'),
-    geminiModel: optionalEnv('GEMINI_MODEL', 'gemini-pro'),
+    // Perplexity AI
+    perplexityApiKey: requireEnv('PERPLEXITY_API_KEY'),
+    perplexityModel: optionalEnv('PERPLEXITY_MODEL', 'sonar-pro'),
 } as const;
 
 export type Config = typeof config;

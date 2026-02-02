@@ -1,46 +1,52 @@
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
 import path from 'path';
 
-// Carregar .env manualmente para teste
+// Carregar .env manualmente
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
-const rawKey = process.env.GEMINI_API_KEY || '';
+const rawKey = process.env.PERPLEXITY_API_KEY || '';
 const apiKey = rawKey.trim();
+const model = process.env.PERPLEXITY_MODEL || 'sonar-pro';
 
-console.log(`🔑 Testando API Key: ${apiKey ? 'Encontrada' : 'NÃO ENCONTRADA'}`);
-console.log(`   - Comprimento: ${apiKey.length} chars (Esperado: 39)`);
-console.log(`   - Início: ${apiKey.substring(0, 8)}...`);
+console.log(`🔑 Testando Perplexity Key: ${apiKey ? 'Encontrada' : 'NÃO ENCONTRADA'}`);
+console.log(`   - Modelo: ${model}`);
+console.log(`   - Comprimento Chave: ${apiKey.length} chars (pplx-...)`);
 console.log(`   - Fim: ...${apiKey.substring(apiKey.length - 4)}`);
 
-if (apiKey.includes(')')) {
-    console.error('\n❌ ERRO CRÍTICO DETECTADO: Sua chave contém um parêntese ")" no final!');
-    console.error('👉 Provavelmente você copiou "(...WUQ)" sem querer.');
-    console.error('👉 Edite o arquivo .env e remova o ")" do final.\n');
+if (!apiKey.startsWith('pplx-')) {
+    console.warn('⚠️ AVISO: Sua chave não começa com "pplx-". Verifique se copiou certo!');
 }
-
-if (!apiKey) {
-    console.error('❌ ERRO: Adicione GEMINI_API_KEY no arquivo .env');
-    process.exit(1);
-}
-
-const genAI = new GoogleGenerativeAI(apiKey);
-const MODELS = ['gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
 
 async function test() {
-    for (const modelName of MODELS) {
-        console.log(`\n🤖 Testando modelo: ${modelName}...`);
-        try {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await model.generateContent('Responda apenas com a palavra: FUNCIONOU');
-            console.log(`✅ SUCESSO com ${modelName}! Resposta: ${result.response.text()}`);
-            process.exit(0); // Sai no primeiro sucesso
-        } catch (error: any) {
-            console.error(`❌ Falha com ${modelName}:`, error.message);
+    console.log(`\n🤖 Testando conexão com Perplexity API (${model})...`);
+
+    try {
+        const response = await fetch('https://api.perplexity.ai/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: [
+                    { role: 'user', content: 'Responda apenas com a palavra: FUNCIONOU' }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.text();
+            throw new Error(`${response.status} ${response.statusText} - ${err}`);
         }
+
+        const data = await response.json();
+        console.log(`✅ SUCESSO! Resposta: ${data.choices[0].message.content}`);
+
+    } catch (error: any) {
+        console.error(`❌ Falha na conexão:`, error.message);
     }
-    console.error('\n❌ TODOS OS MODELOS FALHARAM.');
 }
 
 test();
