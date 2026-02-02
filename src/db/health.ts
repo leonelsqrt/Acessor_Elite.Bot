@@ -59,30 +59,24 @@ export async function getSleepStats(userId: number): Promise<SleepStats | null> 
         [userId]
     );
 
-    // Get today's sleep hours
-    const todayResult = await queryOne<{ hours: number }>(
-        `WITH last_sleep AS (
-       SELECT logged_at FROM sleep_logs
-       WHERE user_id = $1 AND log_type = 'sleep'
-         AND DATE(logged_at) = DATE(NOW() - INTERVAL '1 day')
-       ORDER BY logged_at DESC LIMIT 1
-     ),
-     first_wake AS (
-       SELECT logged_at FROM sleep_logs
-       WHERE user_id = $1 AND log_type = 'wake'
-         AND DATE(logged_at) = DATE(NOW())
-       ORDER BY logged_at ASC LIMIT 1
-     )
-     SELECT EXTRACT(EPOCH FROM (fw.logged_at - ls.logged_at)) / 3600 as hours
-     FROM last_sleep ls, first_wake fw`,
-        [userId]
-    );
+    // Calcular duração do sono: diferença entre último sleep e último wake
+    // Só se o wake for DEPOIS do sleep
+    let todaySleepHours: number | undefined;
+    if (lastSleep?.logged_at && lastWake?.logged_at) {
+        const sleepTime = new Date(lastSleep.logged_at).getTime();
+        const wakeTime = new Date(lastWake.logged_at).getTime();
+
+        // Só calcula se acordou DEPOIS de dormir
+        if (wakeTime > sleepTime) {
+            todaySleepHours = (wakeTime - sleepTime) / (1000 * 60 * 60);
+        }
+    }
 
     return {
         lastSleep: lastSleep?.logged_at,
         lastWake: lastWake?.logged_at,
         avgHours: avgResult?.avg_hours || undefined,
-        todaySleepHours: todayResult?.hours || undefined,
+        todaySleepHours,
     };
 }
 
@@ -217,4 +211,32 @@ export async function getWeeklyWaterData(userId: number): Promise<Array<{
         goalMl,
         metGoal: row.total >= goalMl,
     }));
+}
+
+// ==================== RESET DATA ====================
+
+// Reset all data for today (Brasília timezone)
+export async function resetTodayData(userId: number): Promise<{ waterDeleted: number; sleepDeleted: number }> {
+    // Delete water logs from today
+    const waterResult = await query(
+        `DELETE FROM water_logs 
+         WHERE user_id = $1 
+         AND DATE(logged_at AT TIME ZONE 'America/Sao_Paulo') = DATE(NOW() AT TIME ZONE 'America/Sao_Paulo')
+         RETURNING id`,
+        [userId]
+    );
+
+    // Delete sleep logs from today
+    const sleepResult = await query(
+        `DELETE FROM sleep_logs 
+         WHERE user_id = $1 
+         AND DATE(logged_at AT TIME ZONE 'America/Sao_Paulo') = DATE(NOW() AT TIME ZONE 'America/Sao_Paulo')
+         RETURNING id`,
+        [userId]
+    );
+
+    return {
+        waterDeleted: waterResult.rowCount || 0,
+        sleepDeleted: sleepResult.rowCount || 0,
+    };
 }

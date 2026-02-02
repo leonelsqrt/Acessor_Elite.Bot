@@ -3,12 +3,13 @@ import { setLastMessageId, getLastMessageId } from '../../db/users.js';
 import { getSleepStats, getWaterStats } from '../../db/health.js';
 import { formatDuration, formatTimeOnly } from '../../utils/format.js';
 
-// Barra de progresso compacta (10 blocos)
+// Barra de progresso AZUL (compacta 10 blocos)
 function getProgressBar(percent: number): string {
     const length = 10;
-    const filled = Math.round((percent / 100) * length);
+    const cappedPercent = Math.min(percent, 100);
+    const filled = Math.round((cappedPercent / 100) * length);
     const empty = length - filled;
-    return '▓'.repeat(Math.min(filled, length)) + '░'.repeat(Math.max(empty, 0));
+    return '🟦'.repeat(Math.min(filled, length)) + '⬜'.repeat(Math.max(empty, 0));
 }
 
 // Emoji de status
@@ -19,15 +20,32 @@ function getStatusEmoji(percent: number): string {
     return '⚡';
 }
 
-// Saudação baseada no horário
+// Saudação baseada no horário de Brasília (regra estrita)
 function getGreeting(): string {
-    const hour = new Date().getHours();
+    const now = new Date();
+    const brasiliaTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    const hour = brasiliaTime.getHours();
+
+    // 05:00 - 11:59 = Bom dia
+    // 12:00 - 17:59 = Boa tarde
+    // 18:00 - 04:59 = Boa noite
     if (hour >= 5 && hour < 12) return 'Bom dia';
     if (hour >= 12 && hour < 18) return 'Boa tarde';
     return 'Boa noite';
 }
 
-// Linha separadora (curta para mobile)
+// Data atual em Brasília
+function getBrasiliaDate(): string {
+    const now = new Date();
+    return now.toLocaleDateString('pt-BR', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        timeZone: 'America/Sao_Paulo'
+    });
+}
+
+// Linha separadora
 const LINE = '─────────────────────';
 
 // Build Hub Central Premium
@@ -69,12 +87,7 @@ async function buildHubText(userId: number): Promise<string> {
     const waterStats = await getWaterStats(userId);
 
     const greeting = getGreeting();
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long'
-    });
+    const dateStr = getBrasiliaDate();
 
     let text = `<b>🧠 ASSESSOR ELITE</b>
 ${LINE}
@@ -91,24 +104,29 @@ ${LINE}
     if (sleepStats?.lastWake) {
         text += `☀️ Acordou às <b>${formatTimeOnly(sleepStats.lastWake)}</b>\n`;
     }
-    if (sleepStats?.todaySleepHours) {
-        text += `😴 Dormiu <b>${formatDuration(Math.round(sleepStats.todaySleepHours * 60))}</b>\n`;
+
+    // Dormiu por (calculado corretamente)
+    if (sleepStats?.todaySleepHours && sleepStats.todaySleepHours > 0) {
+        const totalMinutes = Math.round(sleepStats.todaySleepHours * 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        text += `😴 Dormiu por <b>${hours}h${minutes}min</b>\n`;
     }
 
-    // Water info
+    // Water info (meta 4000ml)
     if (waterStats) {
-        const percent = Math.min(waterStats.percentComplete, 100);
+        const percent = waterStats.percentComplete;
         const bar = getProgressBar(percent);
-        const emoji = getStatusEmoji(waterStats.percentComplete);
+        const emoji = getStatusEmoji(percent);
 
         text += `\n💧 <b>Hidratação</b>\n`;
-        text += `${bar} ${waterStats.percentComplete}%\n`;
+        text += `${bar} ${percent}%\n`;
         text += `<b>${waterStats.todayMl}ml</b> / ${waterStats.goalMl}ml ${emoji}\n`;
 
         if (waterStats.remaining > 0) {
             text += `<i>🎯 Faltam ${waterStats.remaining}ml</i>\n`;
         } else {
-            text += `<i>✨ Meta atingida!</i>\n`;
+            text += `<i>💪 Meta atingida!</i>\n`;
         }
     }
 
