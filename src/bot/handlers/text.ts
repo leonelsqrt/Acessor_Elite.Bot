@@ -2,12 +2,13 @@ import { TelegramMessage, sendMessage, deleteMessage, editMessage, buildKeyboard
 import { getBotState, clearBotState, getLastMessageId, updateBotStateData, setBotState } from '../../db/users.js';
 import { updateEventDraft, getActiveEventDraft } from '../../db/events.js';
 import { parseDate, parseTime, formatDate, formatTime } from '../../utils/format.js';
-import { processWithAI } from '../../ai/gemini.js';
+import { processTextWithAI } from '../../services/ai.js';
 import { saveMemory } from '../../db/memory.js';
 import { showEventDraft, askAllDay } from './events.js';
 import { logWater } from '../../db/health.js';
 import { showWaterCard } from './water.js';
 import { handleStart, showHub } from './start.js';
+import { createTransaction, createCategory, getCategories } from '../../db/finances.js';
 
 // Handle text messages (for ForceReply and AI responses)
 export async function handleTextMessage(message: TelegramMessage): Promise<void> {
@@ -189,48 +190,41 @@ async function handleEventLocationInput(chatId: number, userId: number, text: st
 // Handle AI-powered responses
 async function handleAIResponse(chatId: number, userId: number, text: string, firstName: string): Promise<void> {
     // Process with AI
-    const response = await processWithAI(userId, text, firstName);
+    const action = await processTextWithAI(text);
 
-    // Handle AI-detected actions
-    if (response.action) {
-        await executeAIAction(chatId, userId, response.action, response.params || {});
-    }
+    switch (action.type) {
+        case 'finance_transaction':
+            try {
+                // Ensure category exists
+                const existingCats = await getCategories(userId, action.data.type);
+                let catId = existingCats.find(c => c.name.toLowerCase() === action.data.categoryName.toLowerCase())?.id;
 
-    // Send the AI message
-    if (response.message) {
-        await sendMessage(chatId, response.message);
-    }
+                if (!catId) {
+                    // Create new category
+                    catId = await createCategory(userId, action.data.categoryName, action.data.categoryEmoji, action.data.type);
+                }
 
-    // Save memory if needed
-    if (response.shouldSaveMemory && response.memoryContent && response.memoryType) {
-        await saveMemory(userId, response.memoryContent, response.memoryType);
-    }
-}
-
-// Execute action detected by AI
-async function executeAIAction(
-    chatId: number,
-    userId: number,
-    action: string,
-    params: Record<string, any>
-): Promise<void> {
-    switch (action) {
-        case 'show_hub':
-            await handleStart(chatId, userId);
-            break;
-        case 'show_health':
-            // Will be handled via card update
-            break;
-        case 'log_water':
-            if (params.amount) {
-                await logWater(userId, params.amount);
-                await sendMessage(chatId, `💧 ${params.amount}ml registrado com sucesso!`);
+                await createTransaction(userId, action.data.type, action.data.amount, catId, action.data.description);
+                await sendMessage(chatId, `✅ ${action.response}`);
+            } catch (e) {
+                console.error('Error creating transaction from AI:', e);
+                await sendMessage(chatId, '❌ Houve um erro ao registrar sua transação.');
             }
             break;
-        case 'create_event':
-            // AI extracted event data - create draft and show card
+
+        case 'health_water':
+            try {
+                await logWater(userId, action.data.amountMl);
+                await sendMessage(chatId, `💧 ${action.response}`);
+            } catch (e) {
+                console.error('Error loggin water from AI:', e);
+                await sendMessage(chatId, '❌ Erro ao registrar água.');
+            }
             break;
+
+        case 'chat':
         default:
-            console.log(`⚠️ Unknown AI action: ${action}`);
+            await sendMessage(chatId, action.response);
+            break;
     }
 }
