@@ -4,6 +4,7 @@ import { pool } from './db/connection.js';
 import { setupWebhookRoute } from './routes/webhook.js';
 import { setupHealthRoute } from './routes/health.js';
 import { setupOAuthRoutes } from './routes/oauth.js';
+import deployRouter from './routes/deploy.js';
 import { initBot } from './bot/telegram.js';
 
 const app = express();
@@ -15,13 +16,15 @@ app.use(express.json());
 setupHealthRoute(app);
 setupWebhookRoute(app);
 setupOAuthRoutes(app);
+app.use('/webhook', deployRouter);
+
 
 // Initialize bot
 initBot();
 
 // Start server
 const server = app.listen(config.port, () => {
-    console.log(`
+  console.log(`
 🧩 ═══════════════════════════════════════════════════════════
    ACESSOR ELITE BOT
    ───────────────────────────────────────────────────────────
@@ -38,8 +41,8 @@ const server = app.listen(config.port, () => {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-    console.log('🛑 Shutting down...');
-    server.close();
-    await pool.end();
-    process.exit(0);
+  console.log('🛑 Shutting down...');
+  server.close();
+  await pool.end();
+  process.exit(0);
 });
