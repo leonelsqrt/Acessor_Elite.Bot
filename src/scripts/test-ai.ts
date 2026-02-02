@@ -8,10 +8,17 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 
 const rawKey = process.env.GEMINI_API_KEY || '';
 const apiKey = rawKey.trim();
+
 console.log(`🔑 Testando API Key: ${apiKey ? 'Encontrada' : 'NÃO ENCONTRADA'}`);
-console.log(`   - Comprimento: ${apiKey.length} chars`);
+console.log(`   - Comprimento: ${apiKey.length} chars (Esperado: 39)`);
 console.log(`   - Início: ${apiKey.substring(0, 8)}...`);
 console.log(`   - Fim: ...${apiKey.substring(apiKey.length - 4)}`);
+
+if (apiKey.includes(')')) {
+    console.error('\n❌ ERRO CRÍTICO DETECTADO: Sua chave contém um parêntese ")" no final!');
+    console.error('👉 Provavelmente você copiou "(...WUQ)" sem querer.');
+    console.error('👉 Edite o arquivo .env e remova o ")" do final.\n');
+}
 
 if (!apiKey) {
     console.error('❌ ERRO: Adicione GEMINI_API_KEY no arquivo .env');
