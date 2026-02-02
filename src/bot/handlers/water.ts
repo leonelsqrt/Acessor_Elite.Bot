@@ -97,7 +97,7 @@ export async function showWaterInsert(
     await editMessage(chatId, messageId, text, { replyMarkup: keyboard });
 }
 
-// Log water consumption and show updated card
+// Log water consumption and return to Hub with updated dashboard
 export async function logWaterConsumption(
     chatId: number,
     messageId: number,
@@ -107,38 +107,11 @@ export async function logWaterConsumption(
     // Log the consumption
     await logWater(userId, amountMl);
 
-    // Show success toast briefly (we'll update the card immediately)
-    const waterStats = await getWaterStats(userId);
+    // Import here to avoid circular dependency
+    const { showHub } = await import('./start.js');
 
-    let text = `
-<b>💧 CONSUMO DE ÁGUA</b>
-─────────────────────────
-
-✅ <b>${amountMl}ml registrado!</b>
-
-`;
-
-    if (waterStats) {
-        const bar = getProgressBar(waterStats.percentComplete);
-        text += `📊 <b>Total hoje:</b> ${waterStats.todayMl}ml / ${waterStats.goalMl}ml\n`;
-        text += `${bar} ${waterStats.percentComplete}%\n\n`;
-
-        if (waterStats.remaining > 0) {
-            text += `<i>Faltam <b>${waterStats.remaining}ml</b> para a meta! 💪</i>`;
-        } else {
-            text += `<i>🎉 Parabéns! Meta atingida!</i>`;
-        }
-    }
-
-    text += `
-─────────────────────────`;
-
-    const keyboard = buildKeyboard([
-        [{ text: '💧 Inserir Mais', callback_data: 'water_insert' }],
-        [{ text: '↩️ Voltar ao Hub', callback_data: 'hub' }],
-    ]);
-
-    await editMessage(chatId, messageId, text, { replyMarkup: keyboard });
+    // Return to Hub showing updated dashboard
+    await showHub(chatId, messageId, userId);
 }
 
 // Progress bar helper

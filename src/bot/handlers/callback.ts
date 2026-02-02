@@ -119,6 +119,11 @@ export async function handleCallback(
             await showPlaceholder(chatId, messageId, '💰 Finanças', 'Em breve você poderá gerenciar suas finanças aqui!');
             break;
 
+        // No-op button (separator)
+        case 'noop':
+            // Do nothing - this is a separator button
+            break;
+
         default:
             console.log(`⚠️ Unknown callback: ${data}`);
     }

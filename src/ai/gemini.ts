@@ -8,7 +8,7 @@ import { formatDate } from '../utils/format.js';
 const genAI = new GoogleGenerativeAI(config.geminiApiKey);
 
 const model = genAI.getGenerativeModel({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-2.5-pro-preview-05-06',
     safetySettings: [
         { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
         { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
@@ -56,6 +56,32 @@ REGRAS DE MEMÓRIA:
 - NÃO salve "ok", "tá", "beleza"
 - SALVE: objetivos, preferências, compromissos, planos, informações pessoais importantes
 - SEMPRE use a memória para contextualizar respostas`;
+
+// Padrões de saudações que NÃO devem ser salvos na memória
+const GREETING_PATTERNS = [
+    /^(oi+|ol[aá]+|e\s*a[ií]|fala+|eae+|hey+|hi+)[\s\!\?\.\,]*$/i,
+    /^(blz+|beleza+|ok+|t[aá]+|certo|show|legal|massa|top)[\s\!\?\.\,]*$/i,
+    /^(bom\s*dia|boa\s*(tarde|noite))[\s\!\?\.\,]*$/i,
+    /^tudo\s*(bem|bom|certo+|ok|tranquilo|suave)[\s\!\?\.\,\?]*$/i,
+    /^como\s*(vai|est[aá]|t[aá]|vc\s*(est[aá]|t[aá]))[\s\!\?\.\,\?]*$/i,
+    /^(valeu|obrigado|obg|vlw|thx|thanks)[\s\!\?\.\,]*$/i,
+    /^(tchau|flw|bye|at[eé]\s*mais)[\s\!\?\.\,]*$/i,
+];
+
+// Verifica se a mensagem é apenas saudação sem contexto
+function isEmptyGreeting(message: string): boolean {
+    const cleanMsg = message.trim().toLowerCase();
+
+    // Mensagens muito curtas geralmente são saudações
+    if (cleanMsg.length < 5) return true;
+
+    // Verificar padrões de saudação
+    for (const pattern of GREETING_PATTERNS) {
+        if (pattern.test(cleanMsg)) return true;
+    }
+
+    return false;
+}
 
 // Interface para resposta estruturada
 interface AIResponse {

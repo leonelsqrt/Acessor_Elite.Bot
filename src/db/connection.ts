@@ -7,9 +7,10 @@ export const pool = new Pool({
     connectionString: config.databaseUrl,
 });
 
-// Test connection
-pool.on('connect', () => {
-    console.log('✅ Connected to PostgreSQL');
+// Test connection and set timezone
+pool.on('connect', async (client) => {
+    await client.query("SET timezone = 'America/Sao_Paulo'");
+    console.log('✅ Connected to PostgreSQL (timezone: America/Sao_Paulo)');
 });
 
 pool.on('error', (err) => {

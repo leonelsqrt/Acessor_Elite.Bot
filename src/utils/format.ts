@@ -76,6 +76,15 @@ export function formatDuration(minutes: number): string {
     return `${hours}h ${mins}min`;
 }
 
+// Format Date object to time string HH:MM
+export function formatTimeOnly(date: Date): string {
+    return date.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+    });
+}
+
 // Calculate duration between two times in minutes
 export function calculateDuration(
     start: { hours: number; minutes: number },
