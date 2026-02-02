@@ -9,7 +9,7 @@ import {
     isAllowedUser,
     deleteMessage,
 } from '../utils/telegram.js';
-import { ensureUser, getBotState, clearBotState } from '../db/users.js';
+import { ensureUser, getBotState, clearBotState, setLastMessageId } from '../db/users.js';
 import { resetTodayData, updateWaterGoal } from '../db/health.js';
 import { handleStart } from './handlers/start.js';
 import { handleCallback } from './handlers/callback.js';
@@ -23,6 +23,7 @@ async function handleReset(chatId: number, userId: number): Promise<void> {
     const result = await resetTodayData(userId);
     const total = result.waterDeleted + result.sleepDeleted;
 
+    let text: string;
     if (total > 0) {
         // Singular/plural para água
         const waterLabel = result.waterDeleted === 1
@@ -34,9 +35,15 @@ async function handleReset(chatId: number, userId: number): Promise<void> {
             ? '1 registro de sono removido'
             : `${result.sleepDeleted} registros de sono removidos`;
 
-        await sendMessage(chatId, `✅ <b>Reset concluído!</b>\n\n🗑️ ${waterLabel}\n🗑️ ${sleepLabel}\n\nUse /start para voltar ao Hub.`);
+        text = `✅ <b>Reset concluído!</b>\n\n🗑️ ${waterLabel}\n🗑️ ${sleepLabel}\n\nUse /start para voltar ao Hub.`;
     } else {
-        await sendMessage(chatId, `ℹ️ <b>Nenhum dado para resetar hoje.</b>\n\nUse /start para voltar ao Hub.`);
+        text = `ℹ️ <b>Nenhum dado para resetar hoje.</b>\n\nUse /start para voltar ao Hub.`;
+    }
+
+    // Enviar e salvar message_id para poder apagar depois
+    const msg = await sendMessage(chatId, text);
+    if (msg) {
+        await setLastMessageId(userId, msg.message_id);
     }
 }
 

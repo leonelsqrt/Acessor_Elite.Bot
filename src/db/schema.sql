@@ -97,3 +97,90 @@ CREATE TABLE IF NOT EXISTS memories (
 
 CREATE INDEX idx_memories_user ON memories(user_id, memory_type);
 CREATE INDEX idx_memories_keywords ON memories USING GIN(keywords);
+
+-- ==================== MÓDULO FINANÇAS ====================
+
+-- Categorias financeiras (personalizadas pelo usuário)
+CREATE TABLE IF NOT EXISTS financial_categories (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    emoji VARCHAR(10) NOT NULL,
+    category_type VARCHAR(10) NOT NULL CHECK (category_type IN ('entrada', 'saida')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_financial_categories_user ON financial_categories(user_id, category_type);
+
+-- Transações financeiras
+CREATE TABLE IF NOT EXISTS financial_transactions (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    category_id INTEGER REFERENCES financial_categories(id) ON DELETE SET NULL,
+    transaction_type VARCHAR(10) NOT NULL CHECK (transaction_type IN ('entrada', 'saida')),
+    amount DECIMAL(12, 2) NOT NULL,
+    description VARCHAR(255),
+    transaction_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_financial_transactions_user_date ON financial_transactions(user_id, transaction_date DESC);
+
+-- Contas fixas
+CREATE TABLE IF NOT EXISTS fixed_bills (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    emoji VARCHAR(10) NOT NULL,
+    amount DECIMAL(12, 2),
+    is_variable BOOLEAN DEFAULT FALSE,
+    estimated_amount DECIMAL(12, 2),
+    due_day INTEGER NOT NULL CHECK (due_day >= 1 AND due_day <= 31),
+    billing_day INTEGER CHECK (billing_day >= 1 AND billing_day <= 31),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_fixed_bills_user ON fixed_bills(user_id, is_active);
+
+-- Valores de contas (histórico mensal)
+CREATE TABLE IF NOT EXISTS bill_values (
+    id SERIAL PRIMARY KEY,
+    bill_id INTEGER REFERENCES fixed_bills(id) ON DELETE CASCADE,
+    month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+    year INTEGER NOT NULL,
+    amount DECIMAL(12, 2) NOT NULL,
+    is_paid BOOLEAN DEFAULT FALSE,
+    paid_at TIMESTAMP WITH TIME ZONE,
+    defined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(bill_id, month, year)
+);
+
+CREATE INDEX idx_bill_values_bill ON bill_values(bill_id, year, month);
+
+-- Metas financeiras
+CREATE TABLE IF NOT EXISTS financial_goals (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    target_amount DECIMAL(12, 2) NOT NULL,
+    current_amount DECIMAL(12, 2) DEFAULT 0,
+    is_completed BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    completed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_financial_goals_user ON financial_goals(user_id, is_completed);
+
+-- Atividades físicas (módulo saúde)
+CREATE TABLE IF NOT EXISTS activities (
+    id SERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(user_id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    emoji VARCHAR(10) NOT NULL,
+    duration_minutes INTEGER NOT NULL,
+    activity_date DATE DEFAULT CURRENT_DATE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_activities_user_date ON activities(user_id, activity_date DESC);

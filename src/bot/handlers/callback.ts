@@ -1,8 +1,8 @@
 import { editMessage, buildKeyboard, sendMessage, deleteMessage } from '../../utils/telegram.js';
 import { showHub, showModules } from './start.js';
-import { showHealthCard } from './health.js';
-import { showWaterCard, logWaterConsumption, showWaterInsert } from './water.js';
-import { showSleepCard } from './sleep.js';
+import { showHealthModule, showSleepCard, showSleepDetails, showWaterCard, showActivityCard, showHealthStats } from './health.js';
+import { showFinancesModule, showBillsCard, showCategoriesCard, showExtratoCard, showGoalsCard, showReportsCard, showFinancePlaceholder } from './finances.js';
+import { logWaterConsumption, showWaterInsert } from './water.js';
 import { handleGoodMorning, handleGoodNight } from './dayNight.js';
 import {
     handleCreateEvent,
@@ -47,8 +47,24 @@ export async function handleCallback(
 
         // Health area
         case 'health':
-            await showHealthCard(chatId, messageId, userId);
+            await showHealthModule(chatId, messageId, userId);
             break;
+        case 'health_sleep':
+            await showSleepCard(chatId, messageId, userId);
+            break;
+        case 'health_sleep_details':
+            await showSleepDetails(chatId, messageId, userId);
+            break;
+        case 'health_water':
+            await showWaterCard(chatId, messageId, userId);
+            break;
+        case 'health_activity':
+            await showActivityCard(chatId, messageId, userId);
+            break;
+        case 'health_stats':
+            await showHealthStats(chatId, messageId, userId);
+            break;
+        // Legacy callbacks
         case 'sleep':
             await showSleepCard(chatId, messageId, userId);
             break;
@@ -123,7 +139,35 @@ export async function handleCallback(
             await showPlaceholder(chatId, messageId, '📚 Estudos', 'Em breve você poderá gerenciar seus estudos aqui!');
             break;
         case 'finances':
-            await showPlaceholder(chatId, messageId, '💰 Finanças', 'Em breve você poderá gerenciar suas finanças aqui!');
+            await showFinancesModule(chatId, messageId, userId);
+            break;
+        case 'fin_entrada':
+            await showFinancePlaceholder(chatId, messageId, '📥 Nova Entrada', 'Funcionalidade em desenvolvimento!');
+            break;
+        case 'fin_saida':
+            await showFinancePlaceholder(chatId, messageId, '📤 Nova Saída', 'Funcionalidade em desenvolvimento!');
+            break;
+        case 'fin_bills':
+            await showBillsCard(chatId, messageId, userId);
+            break;
+        case 'fin_categories':
+            await showCategoriesCard(chatId, messageId, userId);
+            break;
+        case 'fin_extrato':
+            await showExtratoCard(chatId, messageId, userId);
+            break;
+        case 'fin_goals':
+            await showGoalsCard(chatId, messageId, userId);
+            break;
+        case 'fin_reports':
+            await showReportsCard(chatId, messageId, userId);
+            break;
+        case 'bill_add':
+        case 'bill_edit':
+        case 'cat_add':
+        case 'cat_edit':
+        case 'goal_add':
+            await showFinancePlaceholder(chatId, messageId, '🔧 Em Desenvolvimento', 'Esta funcionalidade será implementada em breve!');
             break;
         case 'reminders':
             await showPlaceholder(chatId, messageId, '⏰ Lembretes', 'Em breve você poderá criar lembretes personalizados!');
