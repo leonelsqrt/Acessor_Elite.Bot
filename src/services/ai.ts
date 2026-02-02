@@ -79,33 +79,39 @@ Estruturas possíveis:
 `;
 
 export type AIAction =
-    | { type: 'finance_transaction'; data: { type: 'entrada' | 'saida'; amount: number; categoryName: string; categoryEmoji: string; description?: string }; response: string }
-    | { type: 'health_water'; data: { amountMl: number }; response: string }
-    | { type: 'chat'; response: string };
+  | { type: 'finance_transaction'; data: { type: 'entrada' | 'saida'; amount: number; categoryName: string; categoryEmoji: string; description?: string }; response: string }
+  | { type: 'health_water'; data: { amountMl: number }; response: string }
+  | { type: 'chat'; response: string };
 
 export async function processTextWithAI(text: string): Promise<AIAction> {
+  try {
+    const model = genAI.getGenerativeModel({ model: config.geminiModel });
+
+    const result = await model.generateContent({
+      contents: [{ role: 'user', parts: [{ text: SYSTEM_PROMPT + `\n\nUSUÁRIO DIZ: "${text}"` }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+      }
+    });
+
+    const responseText = result.response.text();
+    console.log('🤖 AI Response:', responseText);
+
     try {
-        const model = genAI.getGenerativeModel({ model: config.geminiModel });
-
-        const result = await model.generateContent({
-            contents: [{ role: 'user', parts: [{ text: SYSTEM_PROMPT + `\n\nUSUÁRIO DIZ: "${text}"` }] }],
-            generationConfig: {
-                responseMimeType: 'application/json',
-            }
-        });
-
-        const responseText = result.response.text();
-        console.log('🤖 AI Response:', responseText);
-
-        try {
-            return JSON.parse(responseText.trim());
-        } catch (e) {
-            console.error('❌ Erro ao parsear JSON da IA:', e);
-            return { type: 'chat', response: 'Desculpe, não consegui entender exatamente. Pode repetir?' };
-        }
-
-    } catch (error) {
-        console.error('❌ Erro na API Gemini:', error);
-        return { type: 'chat', response: 'Estou com dificuldades de conexão com minha inteligência agora. Tente novamente em instantes.' };
+      return JSON.parse(responseText.trim());
+    } catch (e) {
+      console.error('❌ Erro ao parsear JSON da IA:', e);
+      return { type: 'chat', response: 'Desculpe, não consegui entender exatamente. Pode repetir?' };
     }
+
+  } catch (error: any) {
+    console.error('❌ Erro NEGOCIANDO com Gemini:', error);
+
+    // Log detalhado para debug
+    if (error.message) console.error('Error Message:', error.message);
+    if (error.status) console.error('Error Status:', error.status);
+    if (error.statusText) console.error('Error Status Text:', error.statusText);
+
+    return { type: 'chat', response: 'Estou com dificuldades de conexão com minha inteligência agora. Verifique os logs do servidor.' };
+  }
 }
