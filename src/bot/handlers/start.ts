@@ -3,13 +3,13 @@ import { setLastMessageId, getLastMessageId } from '../../db/users.js';
 import { getSleepStats, getWaterStats } from '../../db/health.js';
 import { formatDuration, formatTimeOnly } from '../../utils/format.js';
 
-// Barra de progresso AZUL (compacta 10 blocos)
+// Barra de progresso (10 blocos)
 function getProgressBar(percent: number): string {
     const length = 10;
     const cappedPercent = Math.min(percent, 100);
     const filled = Math.round((cappedPercent / 100) * length);
     const empty = length - filled;
-    return '🟦'.repeat(Math.min(filled, length)) + '▪️'.repeat(Math.max(empty, 0));
+    return '🟦'.repeat(Math.min(filled, length)) + '⬛'.repeat(Math.max(empty, 0));
 }
 
 // Emoji de status
@@ -103,14 +103,16 @@ ${LINE}
     // Sleep info
     if (sleepStats?.lastWake) {
         text += `☀️ Acordou às <b>${formatTimeOnly(sleepStats.lastWake)}</b>\n`;
-    }
 
-    // Dormiu por (calculado corretamente)
-    if (sleepStats?.todaySleepHours && sleepStats.todaySleepHours > 0) {
-        const totalMinutes = Math.round(sleepStats.todaySleepHours * 60);
-        const hours = Math.floor(totalMinutes / 60);
-        const minutes = totalMinutes % 60;
-        text += `😴 Dormiu por <b>${hours}h${minutes}min</b>\n`;
+        // Dormiu por (calculado corretamente)
+        if (sleepStats?.todaySleepHours && sleepStats.todaySleepHours > 0) {
+            const totalMinutes = Math.round(sleepStats.todaySleepHours * 60);
+            const hours = Math.floor(totalMinutes / 60);
+            const minutes = totalMinutes % 60;
+            text += `😴 Dormiu por <b>${hours}h${minutes}min</b>\n`;
+        }
+    } else {
+        text += `☀️ <i>Sem registro de sono</i>\n`;
     }
 
     // Water info (meta 4000ml)

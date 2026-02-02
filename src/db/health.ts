@@ -240,3 +240,14 @@ export async function resetTodayData(userId: number): Promise<{ waterDeleted: nu
         sleepDeleted: sleepResult.rowCount || 0,
     };
 }
+
+// Update water goal in database
+export async function updateWaterGoal(userId: number, goalMl: number): Promise<void> {
+    await query(
+        `INSERT INTO user_settings (user_id, water_goal_ml)
+         VALUES ($1, $2)
+         ON CONFLICT (user_id) 
+         DO UPDATE SET water_goal_ml = $2`,
+        [userId, goalMl]
+    );
+}

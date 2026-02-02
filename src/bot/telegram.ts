@@ -10,18 +10,31 @@ import {
     deleteMessage,
 } from '../utils/telegram.js';
 import { ensureUser, getBotState, clearBotState } from '../db/users.js';
-import { resetTodayData } from '../db/health.js';
+import { resetTodayData, updateWaterGoal } from '../db/health.js';
 import { handleStart } from './handlers/start.js';
 import { handleCallback } from './handlers/callback.js';
 import { handleTextMessage } from './handlers/text.js';
 
 // Handle /reset command
 async function handleReset(chatId: number, userId: number): Promise<void> {
+    // Atualizar meta de água para 4000ml no banco
+    await updateWaterGoal(userId, 4000);
+
     const result = await resetTodayData(userId);
     const total = result.waterDeleted + result.sleepDeleted;
 
     if (total > 0) {
-        await sendMessage(chatId, `✅ <b>Reset concluído!</b>\n\n🗑️ ${result.waterDeleted} registro(s) de água removido(s)\n🗑️ ${result.sleepDeleted} registro(s) de sono removido(s)\n\nUse /start para voltar ao Hub.`);
+        // Singular/plural para água
+        const waterLabel = result.waterDeleted === 1
+            ? '1 registro de água removido'
+            : `${result.waterDeleted} registros de água removidos`;
+
+        // Singular/plural para sono
+        const sleepLabel = result.sleepDeleted === 1
+            ? '1 registro de sono removido'
+            : `${result.sleepDeleted} registros de sono removidos`;
+
+        await sendMessage(chatId, `✅ <b>Reset concluído!</b>\n\n🗑️ ${waterLabel}\n🗑️ ${sleepLabel}\n\nUse /start para voltar ao Hub.`);
     } else {
         await sendMessage(chatId, `ℹ️ <b>Nenhum dado para resetar hoje.</b>\n\nUse /start para voltar ao Hub.`);
     }
