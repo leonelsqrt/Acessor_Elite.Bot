@@ -3,18 +3,12 @@ import { setLastMessageId, getLastMessageId } from '../../db/users.js';
 import { getSleepStats, getWaterStats } from '../../db/health.js';
 import { formatDuration, formatTimeOnly } from '../../utils/format.js';
 
-// Centraliza texto
-function centerText(text: string, width: number = 36): string {
-    const textLength = [...text].length;
-    const padding = Math.max(0, Math.floor((width - textLength) / 2));
-    return ' '.repeat(padding) + text;
-}
-
-// Barra de progresso visual
-function getProgressBar(percent: number, length: number = 16): string {
+// Barra de progresso compacta (10 blocos)
+function getProgressBar(percent: number): string {
+    const length = 10;
     const filled = Math.round((percent / 100) * length);
     const empty = length - filled;
-    return '█'.repeat(Math.min(filled, length)) + '░'.repeat(Math.max(empty, 0));
+    return '▓'.repeat(Math.min(filled, length)) + '░'.repeat(Math.max(empty, 0));
 }
 
 // Emoji de status
@@ -22,8 +16,7 @@ function getStatusEmoji(percent: number): string {
     if (percent >= 100) return '✅';
     if (percent >= 75) return '🔥';
     if (percent >= 50) return '💪';
-    if (percent >= 25) return '⚡';
-    return '💧';
+    return '⚡';
 }
 
 // Saudação baseada no horário
@@ -34,8 +27,8 @@ function getGreeting(): string {
     return 'Boa noite';
 }
 
-// Linha separadora full width
-const LINE = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+// Linha separadora (curta para mobile)
+const LINE = '─────────────────────';
 
 // Build Hub Central Premium
 export async function handleStart(chatId: number, userId: number): Promise<void> {
@@ -44,53 +37,7 @@ export async function handleStart(chatId: number, userId: number): Promise<void>
         await deleteMessage(chatId, lastMsgId);
     }
 
-    const sleepStats = await getSleepStats(userId);
-    const waterStats = await getWaterStats(userId);
-
-    const greeting = getGreeting();
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long'
-    });
-
-    // Build text with exact spacing
-    let text = `${centerText('🧠 ASSESSOR ELITE')}
-${LINE}
-
-${greeting}, Leonel!
-🗓 ${dateStr}
-
-${LINE}
-${centerText('⚡ DASHBOARD DO DIA')}
-${LINE}
-
-`;
-
-    // Sleep info (sem espaçamento)
-    if (sleepStats?.lastWake) {
-        text += `☀️ Acordou às ${formatTimeOnly(sleepStats.lastWake)}\n`;
-    }
-    if (sleepStats?.todaySleepHours) {
-        text += `😴 Dormiu ${formatDuration(Math.round(sleepStats.todaySleepHours * 60))}\n`;
-    }
-
-    // Water info com barra centralizada e padding mínimo
-    if (waterStats) {
-        const percent = waterStats.percentComplete;
-        const bar = getProgressBar(percent);
-        const emoji = getStatusEmoji(percent);
-
-        text += `
-${centerText(bar)}
-💧 ${waterStats.todayMl}ml de ${waterStats.goalMl}ml ${emoji} (${percent}%)
-🎯 ${waterStats.remaining > 0 ? `Faltam ${waterStats.remaining}ml para a meta` : '✨ Meta atingida!'}
-
-`;
-    }
-
-    text += LINE;
+    const text = await buildHubText(userId);
 
     const keyboard = buildKeyboard([
         [
@@ -116,8 +63,8 @@ ${centerText(bar)}
     }
 }
 
-// Show Hub (edit existing message)
-export async function showHub(chatId: number, messageId: number, userId: number): Promise<void> {
+// Build hub text
+async function buildHubText(userId: number): Promise<string> {
     const sleepStats = await getSleepStats(userId);
     const waterStats = await getWaterStats(userId);
 
@@ -129,39 +76,50 @@ export async function showHub(chatId: number, messageId: number, userId: number)
         month: 'long'
     });
 
-    let text = `${centerText('🧠 ASSESSOR ELITE')}
+    let text = `<b>🧠 ASSESSOR ELITE</b>
 ${LINE}
 
 ${greeting}, Leonel!
-🗓 ${dateStr}
+🗓 <i>${dateStr}</i>
 
 ${LINE}
-${centerText('⚡ DASHBOARD DO DIA')}
+<b>⚡ DASHBOARD DO DIA</b>
 ${LINE}
-
 `;
 
+    // Sleep info
     if (sleepStats?.lastWake) {
-        text += `☀️ Acordou às ${formatTimeOnly(sleepStats.lastWake)}\n`;
+        text += `☀️ Acordou às <b>${formatTimeOnly(sleepStats.lastWake)}</b>\n`;
     }
     if (sleepStats?.todaySleepHours) {
-        text += `😴 Dormiu ${formatDuration(Math.round(sleepStats.todaySleepHours * 60))}\n`;
+        text += `😴 Dormiu <b>${formatDuration(Math.round(sleepStats.todaySleepHours * 60))}</b>\n`;
     }
 
+    // Water info
     if (waterStats) {
-        const percent = waterStats.percentComplete;
+        const percent = Math.min(waterStats.percentComplete, 100);
         const bar = getProgressBar(percent);
-        const emoji = getStatusEmoji(percent);
+        const emoji = getStatusEmoji(waterStats.percentComplete);
 
-        text += `
-${centerText(bar)}
-💧 ${waterStats.todayMl}ml de ${waterStats.goalMl}ml ${emoji} (${percent}%)
-🎯 ${waterStats.remaining > 0 ? `Faltam ${waterStats.remaining}ml para a meta` : '✨ Meta atingida!'}
+        text += `\n💧 <b>Hidratação</b>\n`;
+        text += `${bar} ${waterStats.percentComplete}%\n`;
+        text += `<b>${waterStats.todayMl}ml</b> / ${waterStats.goalMl}ml ${emoji}\n`;
 
-`;
+        if (waterStats.remaining > 0) {
+            text += `<i>🎯 Faltam ${waterStats.remaining}ml</i>\n`;
+        } else {
+            text += `<i>✨ Meta atingida!</i>\n`;
+        }
     }
 
-    text += LINE;
+    text += `\n${LINE}`;
+
+    return text;
+}
+
+// Show Hub (edit existing message)
+export async function showHub(chatId: number, messageId: number, userId: number): Promise<void> {
+    const text = await buildHubText(userId);
 
     const keyboard = buildKeyboard([
         [
@@ -186,51 +144,8 @@ ${centerText(bar)}
 
 // Show modules
 export async function showModules(chatId: number, messageId: number, userId: number): Promise<void> {
-    const sleepStats = await getSleepStats(userId);
-    const waterStats = await getWaterStats(userId);
-
-    const greeting = getGreeting();
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('pt-BR', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long'
-    });
-
-    let text = `${centerText('🧠 ASSESSOR ELITE')}
-${LINE}
-
-${greeting}, Leonel!
-🗓 ${dateStr}
-
-${LINE}
-${centerText('⚡ DASHBOARD DO DIA')}
-${LINE}
-
-`;
-
-    if (sleepStats?.lastWake) {
-        text += `☀️ Acordou às ${formatTimeOnly(sleepStats.lastWake)}\n`;
-    }
-    if (sleepStats?.todaySleepHours) {
-        text += `😴 Dormiu ${formatDuration(Math.round(sleepStats.todaySleepHours * 60))}\n`;
-    }
-
-    if (waterStats) {
-        const percent = waterStats.percentComplete;
-        const bar = getProgressBar(percent);
-        const emoji = getStatusEmoji(percent);
-
-        text += `
-${centerText(bar)}
-💧 ${waterStats.todayMl}ml de ${waterStats.goalMl}ml ${emoji} (${percent}%)
-🎯 ${waterStats.remaining > 0 ? `Faltam ${waterStats.remaining}ml para a meta` : '✨ Meta atingida!'}
-
-`;
-    }
-
-    text += LINE;
-    text += `\n${centerText('📂 MÓDULOS DISPONÍVEIS')}\n`;
+    const text = await buildHubText(userId);
+    const finalText = text + `\n\n<b>📂 MÓDULOS</b>`;
 
     const keyboard = buildKeyboard([
         [{ text: '💪 Saúde', callback_data: 'health' }],
@@ -238,8 +153,8 @@ ${centerText(bar)}
             { text: '📚 Estudos', callback_data: 'studies' },
             { text: '💰 Finanças', callback_data: 'finances' },
         ],
-        [{ text: '↩️ Voltar ao Hub', callback_data: 'hub' }],
+        [{ text: '↩️ Voltar', callback_data: 'hub' }],
     ]);
 
-    await editMessage(chatId, messageId, text, { replyMarkup: keyboard });
+    await editMessage(chatId, messageId, finalText, { replyMarkup: keyboard });
 }
